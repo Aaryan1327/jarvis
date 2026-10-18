@@ -1,0 +1,36 @@
+name: Build Jarvis APK v2
+on:
+  workflow_dispatch:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack the Jarvis project
+        run: |
+          python3 - <<'PY'
+          import re, base64, pathlib
+          t = pathlib.Path('.github/workflows/jarvis.yml').read_text()
+          m = re.search(r"<<'B64'\n(.*?)\n\s*B64\n", t, re.S)
+          pathlib.Path('project.zip').write_bytes(base64.b64decode(''.join(m.group(1).split())))
+          PY
+          mkdir -p project
+          unzip -o project.zip -d project
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Accept Android licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build the APK
+        run: gradle assembleDebug --no-daemon
+        working-directory: project
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-APK
+          path: project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
